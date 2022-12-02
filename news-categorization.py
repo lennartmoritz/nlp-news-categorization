@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
@@ -116,8 +117,9 @@ for epoch in range(num_epochs):
     train_dataset = train_dataset.sample(frac=1).reset_index(drop=True)
     # determine the number of min-batches based on the batch size and size of training data
     total_batch = int(len(train_dataset) / batch_size)
+    avg_loss = 0
     # Loop over all batches
-    for i in range(total_batch):
+    for i in tqdm(range(total_batch)):
         batch_x, batch_y = get_batch(train_dataset, i, batch_size)
         titles = torch.FloatTensor(batch_x)
         titles = titles.to(device)
@@ -130,12 +132,12 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()  # zero the gradient buffer
         outputs = news_net(titles).cpu()
         loss = criterion(outputs, labels)
+        avg_loss += loss.item()
         loss.backward()
         optimizer.step()
 
-        if (i + 1) % 4 == 0:
-            print('Epoch [%d/%d], Batch [%d/%d], Loss: %.4f'
-                  % (epoch + 1, num_epochs, i + 1, len(train_dataset) / batch_size, loss.data))
+    avg_loss = avg_loss / total_batch
+    print('Finished epoch [%d/%d], Average loss: %.4f' % (epoch + 1, num_epochs, avg_loss))
 
 # Calculate Accuracy
 correct = 0
@@ -147,6 +149,6 @@ for i in range(len(test_dataset)):
     outputs = news_net(titles).cpu()
     _, predicted = torch.max(outputs.data, 1)
     total += 1
-    correct += (predicted == test_y).sum()
+    correct += 1 if predicted == test_y else 0
 
 print('Accuracy of the model on the test data: %d %%' % (100 * correct / total))
