@@ -106,7 +106,8 @@ class NewsClassifier(nn.Module):
 
 
 news_net = NewsClassifier(input_size, hidden_size, num_classes)
-news_net.to(device)
+news_net = news_net.to(device)
+news_net.train()
 # Loss and Optimizer
 criterion = nn.CrossEntropyLoss()  # This includes the Softmax loss function
 optimizer = torch.optim.Adam(news_net.parameters(), lr=learning_rate)
@@ -124,22 +125,24 @@ for epoch in range(num_epochs):
         titles = torch.FloatTensor(batch_x)
         titles = titles.to(device)
         labels = torch.LongTensor(batch_y)
+        labels = labels.to(device)
         # print("articles",articles)
         # print(batch_x, labels)
         # print("size labels",labels.size())
 
         # Forward + Backward + Optimize
         optimizer.zero_grad()  # zero the gradient buffer
-        outputs = news_net(titles).cpu()
+        outputs = news_net(titles)
         loss = criterion(outputs, labels)
-        avg_loss += loss.item()
         loss.backward()
         optimizer.step()
+        avg_loss += loss.item()
 
     avg_loss = avg_loss / total_batch
     print('Finished epoch [%d/%d], Average loss: %.4f' % (epoch + 1, num_epochs, avg_loss))
 
 # Calculate Accuracy
+model.eval()
 correct = 0
 total = 0
 for i in range(len(test_dataset)):
