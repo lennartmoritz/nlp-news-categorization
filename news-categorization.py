@@ -61,10 +61,10 @@ test_dataset = full_test_dataset
 
 #===DATALOADER===
 class CustomNewsDataset(Dataset):
-    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
+    def __init__(self, annotations_file, transform=None, target_transform=None):
         data = pd.read_csv(annotations_file)
         self.labels = data['CATEGORY']
-        self.titles = data['TITLES']
+        self.titles = data['TITLE']
         self.transform = transform
         self.target_transform = target_transform
 
@@ -86,9 +86,10 @@ training_dataset, testing_dataset = torch.utils.data.random_split(dataset, [trai
 params = {'batch_size': 64,
           'shuffle': True,
           'num_workers': 6}
-#dataloader
-train_generator = DataLoader(training_dataset, params)
-test_generator = DataLoader(testing_dataset, params)
+
+# dataloader
+train_generator = DataLoader(training_dataset, **params)
+test_generator = DataLoader(testing_dataset, **params)
 
 # Getting all the vocabularies and indexing to a unique position
 vocab = Counter()
