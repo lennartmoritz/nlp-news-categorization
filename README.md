@@ -18,7 +18,7 @@ Assignment Option Four - News Categorization using PyTorch
 Text categorization using PyTorch
 
  * A typical workflow in PyTorch. 
-![nlpPyTorchTypicalWorkflow.png](nlpPyTorchTypicalWorkflow.png)
+![images/nlpPyTorchTypicalWorkflow.png](images/nlpPyTorchTypicalWorkflow.png)
 
 
 ---
