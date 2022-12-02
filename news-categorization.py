@@ -142,7 +142,7 @@ for epoch in range(num_epochs):
     print('Finished epoch [%d/%d], Average loss: %.4f' % (epoch + 1, num_epochs, avg_loss))
 
 # Calculate Accuracy
-model.eval()
+news_net.eval()
 correct = 0
 total = 0
 for i in range(len(test_dataset)):
