@@ -59,25 +59,48 @@ full_train_dataset, full_test_dataset = data_splitter([e_dataset, b_dataset, t_d
 train_dataset = full_train_dataset
 test_dataset = full_test_dataset
 
+def get_word_embeddings(dataset):
+    # Getting all the vocabularies and indexing to a unique position
+    vocab = Counter()
+    # Indexing words from the training data
+    for text in dataset['TITLE']:
+        for word in text.split(' '):
+            vocab[word.lower()] += 1
+
+    word_embeddings = {}
+    for i, word in enumerate(vocab):
+        word_embeddings[word.lower()] = i
+
+    return word_embeddings
+
+
 #===DATALOADER===
+data = pd.read_csv("data/uci-news-aggregator.csv")
+embeddings = get_word_embeddings(data)
+categories = ['e', 'b', 't', 'm']
+
 class CustomNewsDataset(Dataset):
-    def __init__(self, annotations_file, transform=None, target_transform=None):
-        data = pd.read_csv(annotations_file)
+    def __init__(self, data, embeddings):
         self.labels = data['CATEGORY']
         self.titles = data['TITLE']
-        self.transform = transform
-        self.target_transform = target_transform
+        self.embeddings = embeddings
 
     def __len__(self):
         return len(self.titles)
 
     def __getitem__(self, idx):
-        title = self.titles.iloc[idx, 1]
-        label = self.labels.iloc[idx, 1]
-        return title, label
+        title = self.titles.iloc[idx]
+        embedded_title = np.zeros(len(embeddings), dtype=np.float64)
+
+        for word in title.split(' '):
+            embedded_title[self.embeddings[word.lower()]] += 1
+
+        label = self.labels.iloc[idx]
+        label = categories.index(label)
+        return torch.Tensor(embedded_title), label
 
 
-dataset = CustomNewsDataset("data/uci-news-aggregator.csv")
+dataset = CustomNewsDataset(data, embeddings)
 train_size = int(0.8 * len(dataset))
 test_size = len(dataset) - train_size
 training_dataset, testing_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
@@ -91,63 +114,6 @@ params = {'batch_size': 64,
 train_generator = DataLoader(training_dataset, **params)
 test_generator = DataLoader(testing_dataset, **params)
 
-# Getting all the vocabularies and indexing to a unique position
-vocab = Counter()
-# Indexing words from the training data
-for text in train_dataset['TITLE']:
-    for word in text.split(' '):
-        vocab[word.lower()] += 1
-
-# Indexing words from the test data
-for text in test_dataset['TITLE']:
-    for word in text.split(' '):
-        vocab[word.lower()] += 1
-
-total_words = len(vocab)
-
-
-def get_word_2_index(vocab):
-    word2index = {}
-    for i, word in enumerate(vocab):
-        word2index[word.lower()] = i
-
-    return word2index
-
-
-word2index = get_word_2_index(vocab)
-
-
-def get_batch(df, i, batch_size):
-    batches = []
-    results = []
-    # Split into different batchs, get the next batch
-    titles = df['TITLE'].iloc[i * batch_size:i * batch_size + batch_size]
-    # get the targets
-    categories = df['CATEGORY'].iloc[i * batch_size:i * batch_size + batch_size]
-    for title in titles:
-        layer = np.zeros(total_words, dtype=float)
-
-        for word in title.split(' '):
-            layer[word2index[word.lower()]] += 1
-        batches.append(layer)
-
-    # We have 4 categories
-    for category in categories:
-        index_y = -1
-        if category == 'e':
-            index_y = 0
-        elif category == 'b':
-            index_y = 1
-        elif category == 't':
-            index_y = 2
-        elif category == 'm':
-            index_y = 3
-        results.append(index_y)
-
-    # the training and the targets
-    return np.array(batches), np.array(results)
-
-
 # Parameters
 learning_rate = 0.01
 num_epochs = 10
@@ -156,7 +122,7 @@ display_step = 1
 
 # Network Parameters
 hidden_size = 100  # 1st layer and 2nd layer number of features
-input_size = total_words  # Words in vocab
+input_size = len(embeddings)  # Words in vocab
 num_classes = 4  # Categories: "e", "b", "t", "m"
 
 
@@ -194,15 +160,8 @@ for epoch in range(num_epochs):
     total_batch = int(len(train_dataset) / batch_size)
     avg_loss = 0
     # Loop over all batches
-    for i in tqdm(range(total_batch)):
-        batch_x, batch_y = get_batch(train_dataset, i, batch_size)
-        titles = torch.FloatTensor(batch_x)
-        titles = titles.to(device)
-        labels = torch.LongTensor(batch_y)
-        labels = labels.to(device)
-        # print("articles",articles)
-        # print(batch_x, labels)
-        # print("size labels",labels.size())
+    for titles, labels in tqdm(train_generator):
+        titles, labels = titles.to(device), labels.to(device)
 
         # Forward + Backward + Optimize
         optimizer.zero_grad()  # zero the gradient buffer
@@ -217,11 +176,20 @@ for epoch in range(num_epochs):
 
 # Calculate Accuracy
 news_net.eval()
-# shuffle the test dataset
-test_x, test_y = get_batch(test_dataset, 0, 100)  # todo: change to all test data
-outputs = news_net(test_x)
-_, predicted = torch.max(outputs.data, 1)
+all_predictions = []
+all_labels = []
+
+for test_data, labels in tqdm(test_generator):
+    test_data, labels = test_data.to(device), labels.to(device)
+    all_labels.append(labels)
+    outputs = news_net(test_data)
+    _, predicted = torch.max(outputs.data, 1)
+    all_predictions.append(predicted.detach().numpy())
+
+all_predictions = torch.Tensor(np.concatenate(all_predictions))
+all_labels = torch.Tensor(np.concatenate(all_labels))
+
 accuracy = Accuracy(task='multiclass', num_classes=4)
-acc = accuracy(predicted, test_y)
+acc = accuracy(all_predictions, all_labels)
 
 print('Accuracy of the model on the test data: %f' % (acc,))
