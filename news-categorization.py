@@ -185,10 +185,10 @@ all_labels = []
 
 for test_data, labels in tqdm(test_generator):
     test_data, labels = test_data.to(device), labels.to(device)
-    all_labels.append(labels)
+    all_labels.append(labels.cpu().detach().numpy())
     outputs = news_net(test_data)
     _, predicted = torch.max(outputs.data, 1)
-    all_predictions.append(predicted.detach().numpy())
+    all_predictions.append(predicted.cpu().detach().numpy())
 
 all_predictions = torch.Tensor(np.concatenate(all_predictions))
 all_labels = torch.Tensor(np.concatenate(all_labels))
