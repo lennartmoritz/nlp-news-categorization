@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+from torch.utils.data import Dataset, DataLoader
 from torchmetrics import Accuracy
 
 use_cuda = torch.cuda.is_available()
@@ -18,7 +19,7 @@ full_dataset = pd.read_csv('data/uci-news-aggregator.csv')
 
 # Group data for customized data selection
 grouped_dataset = full_dataset.groupby(full_dataset['CATEGORY'])
-e_dataset = grouped_dataset.get_group('e') 
+e_dataset = grouped_dataset.get_group('e')
 b_dataset = grouped_dataset.get_group('b')
 t_dataset = grouped_dataset.get_group('t')
 m_dataset = grouped_dataset.get_group('m')
@@ -54,19 +55,40 @@ tm_train_dataset, tm_test_dataset = data_splitter([t_dataset, m_dataset])
 
 full_train_dataset, full_test_dataset = data_splitter([e_dataset, b_dataset, t_dataset, m_dataset])
 
-# Sanity-Check
-print("Number of train eb: " + str(len(eb_train_dataset)) + " Number of test eb: " + str(len(eb_test_dataset)))
-print("Number of train et: " + str(len(et_train_dataset)) + " Number of test et: " + str(len(et_test_dataset)))
-print("Number of train em: " + str(len(eb_train_dataset)) + " Number of test em: " + str(len(em_test_dataset)))
-
-print("Number of train bt: " + str(len(bt_train_dataset)) + " Number of test bt: " + str(len(bt_test_dataset)))
-print("Number of train bm: " + str(len(bm_train_dataset)) + " Number of test bm: " + str(len(bm_test_dataset)))
-
-print("Number of train tm: " + str(len(tm_train_dataset)) + " Number of test tm: " + str(len(tm_test_dataset)))
-
 # TEMP to not interrupt other coder!
 train_dataset = full_train_dataset
 test_dataset = full_test_dataset
+
+#===DATALOADER===
+class CustomNewsDataset(Dataset):
+    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
+        data = pd.read_csv(annotations_file)
+        self.labels = data['CATEGORY']
+        self.titles = data['TITLES']
+        self.transform = transform
+        self.target_transform = target_transform
+
+    def __len__(self):
+        return len(self.titles)
+
+    def __getitem__(self, idx):
+        title = self.titles.iloc[idx, 1]
+        label = self.labels.iloc[idx, 1]
+        return title, label
+
+
+dataset = CustomNewsDataset("data/uci-news-aggregator.csv")
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
+training_dataset, testing_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+# Parameters
+params = {'batch_size': 64,
+          'shuffle': True,
+          'num_workers': 6}
+#dataloader
+train_generator = DataLoader(training_dataset, params)
+test_generator = DataLoader(testing_dataset, params)
 
 # Getting all the vocabularies and indexing to a unique position
 vocab = Counter()
@@ -122,7 +144,7 @@ def get_batch(df, i, batch_size):
         results.append(index_y)
 
     # the training and the targets
-    return torch.FloatTensor(np.array(batches)).to(device), torch.LongTensor(np.array(results)).to(device)
+    return np.array(batches), np.array(results)
 
 
 # Parameters
