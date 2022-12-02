@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+from torchmetrics import Accuracy
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
@@ -51,6 +52,8 @@ bm_train_dataset, bm_test_dataset = data_splitter([b_dataset, m_dataset])
 
 tm_train_dataset, tm_test_dataset = data_splitter([t_dataset, m_dataset])
 
+full_train_dataset, full_test_dataset = data_splitter([e_dataset, b_dataset, t_dataset, m_dataset])
+
 # Sanity-Check
 print("Number of train eb: " + str(len(eb_train_dataset)) + " Number of test eb: " + str(len(eb_test_dataset)))
 print("Number of train et: " + str(len(et_train_dataset)) + " Number of test et: " + str(len(et_test_dataset)))
@@ -62,8 +65,8 @@ print("Number of train bm: " + str(len(bm_train_dataset)) + " Number of test bm:
 print("Number of train tm: " + str(len(tm_train_dataset)) + " Number of test tm: " + str(len(tm_test_dataset)))
 
 # TEMP to not interrupt other coder!
-train_dataset = eb_train_dataset
-test_dataset = eb_test_dataset
+train_dataset = full_train_dataset
+test_dataset = full_test_dataset
 
 # Getting all the vocabularies and indexing to a unique position
 vocab = Counter()
@@ -119,7 +122,7 @@ def get_batch(df, i, batch_size):
         results.append(index_y)
 
     # the training and the targets
-    return np.array(batches), np.array(results)
+    return torch.FloatTensor(np.array(batches)).to(device), torch.LongTensor(np.array(results)).to(device)
 
 
 # Parameters
@@ -191,15 +194,11 @@ for epoch in range(num_epochs):
 
 # Calculate Accuracy
 news_net.eval()
-correct = 0
-total = 0
-for i in range(len(test_dataset)):
-    test_x, test_y = get_batch(test_dataset, i, 1)
-    titles = torch.FloatTensor(test_x)
-    titles = titles.to(device)
-    outputs = news_net(titles).cpu()
-    _, predicted = torch.max(outputs.data, 1)
-    total += 1
-    correct += 1 if predicted == test_y else 0
+# shuffle the test dataset
+test_x, test_y = get_batch(test_dataset, 0, 100)  # todo: change to all test data
+outputs = news_net(test_x)
+_, predicted = torch.max(outputs.data, 1)
+accuracy = Accuracy(task='multiclass', num_classes=4)
+acc = accuracy(predicted, test_y)
 
-print('Accuracy of the model on the test data: %d %%' % (100 * correct / total))
+print('Accuracy of the model on the test data: %f' % (acc,))
