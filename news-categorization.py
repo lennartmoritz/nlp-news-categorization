@@ -9,6 +9,9 @@ from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from torchmetrics import Accuracy
 
+# Recommended by error-message
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 print('Device:', device)
@@ -101,9 +104,10 @@ class CustomNewsDataset(Dataset):
 
 
 dataset = CustomNewsDataset(data, embeddings)
-train_size = int(0.8 * len(dataset))
-test_size = len(dataset) - train_size
-training_dataset, testing_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+train_size = 100 #int(0.8 * len(dataset))
+test_size = 100 #len(dataset) - train_size
+validate_size = len(dataset) - (train_size + test_size)
+training_dataset, testing_dataset, validate_dataset = torch.utils.data.random_split(dataset, [train_size, test_size, validate_size])
 
 # Parameters
 params = {'batch_size': 64,
