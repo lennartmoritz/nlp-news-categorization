@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Authors: 
+# Carlotta Mahncke, Lennart Joshua Moritz, Timon Engelke and Christian Schuler
+
 from collections import Counter
 
 import numpy as np
@@ -22,6 +25,7 @@ def data_splitter(list_of_datasets):
     test_dataset = dataframes_all.drop(train_dataset.index)
     return train_dataset, test_dataset
 
+# 
 def get_word_embeddings(dataset):
         # Getting all the vocabularies and indexing to a unique position
         vocab = Counter()
@@ -36,6 +40,7 @@ def get_word_embeddings(dataset):
 
         return word_embeddings
 
+# 
 class CustomNewsDataset(Dataset):
         def __init__(self, data, embeddings, categories):
             self.labels = data['CATEGORY']
@@ -56,7 +61,8 @@ class CustomNewsDataset(Dataset):
             label = self.labels.iloc[idx]
             label = self.categories.index(label)
             return torch.Tensor(embedded_title), label
-# define the network
+            
+# Define the network
 class NewsClassifier(nn.Module):
         def __init__(self, input_size, hidden_size, num_classes):
             super().__init__()
@@ -65,7 +71,7 @@ class NewsClassifier(nn.Module):
             self.layer_2 = nn.Linear(hidden_size, hidden_size, bias=True)
             self.output_layer = nn.Linear(hidden_size, num_classes, bias=True)
 
-        # accept input and return an output
+        # Accept input and return an output
         def forward(self, x):
             out = self.layer_1(x)
             out = self.relu(out)
@@ -74,18 +80,18 @@ class NewsClassifier(nn.Module):
             out = self.output_layer(out)
             return out
 
-
+# Safe-guarding the script to prevent errors occuring related to multiprocessing
 if __name__ == "__main__":
+    # Recommended part of the solution (for ubuntu) by encountered error-message
     torch.multiprocessing.set_sharing_strategy('file_system')
-    # Recommended by error-message
 
+    # Dynamic switch between cpu and gpu (cuda)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     print('Device:', device)
 
-    # Read dataset
+    # Read entire dataset
     full_dataset = pd.read_csv('data/uci-news-aggregator.csv')
-
 
     # Group data for customized data selection
     grouped_dataset = full_dataset.groupby(full_dataset['CATEGORY'])
@@ -99,7 +105,6 @@ if __name__ == "__main__":
     print("Number of b: " + str(len(b_dataset)))
     print("Number of t: " + str(len(t_dataset)))
     print("Number of m: " + str(len(m_dataset)))
-
 
     # Duo-Datasets
     eb_train_dataset, eb_test_dataset = data_splitter([e_dataset, b_dataset])
@@ -117,7 +122,6 @@ if __name__ == "__main__":
     train_dataset = full_train_dataset
     test_dataset = full_test_dataset
 
-
     #===DATALOADER===
     data = pd.read_csv("data/uci-news-aggregator.csv")
     embeddings = get_word_embeddings(data)
@@ -134,35 +138,37 @@ if __name__ == "__main__":
               'shuffle': True,
               'num_workers': 6}
 
-    # dataloader
+    # Dataloader
     train_generator = DataLoader(training_dataset, **params)
     test_generator = DataLoader(testing_dataset, **params)
 
-    # Parameters
-    learning_rate = 0.01
-    num_epochs = 10
-    batch_size = 150
-    display_step = 1
+    # Parameters TODO: Christian-Question: How come we have batch_size in params and then here again?
+    learning_rate = 0.01    # How fast the model learns
+    num_epochs = 1          # How often the model walks through the data
+    batch_size = 150        # How big the groups of separated data entries are
+    display_step = 1        # TODO: Is this even used? Also: What is it?
 
     # Network Parameters
     hidden_size = 100  # 1st layer and 2nd layer number of features
     input_size = len(embeddings)  # Words in vocab
     num_classes = 4  # Categories: "e", "b", "t", "m"
+    # e: entertainment | b: business | t: science and technology | m: health
+    # e: 152469        | b: 115967   | t: 108344                 | m: 45639
 
-
+    # Model for news classification
     news_net = NewsClassifier(input_size, hidden_size, num_classes)
     news_net = news_net.to(device)
     news_net.train()
+    
     # Loss and Optimizer
     criterion = nn.CrossEntropyLoss()  # This includes the Softmax loss function
     optimizer = torch.optim.Adam(news_net.parameters(), lr=learning_rate)
 
-
     # Train the Model
     for epoch in range(num_epochs):
-        # shuffle the data
+        # Shuffle the data
         train_dataset = train_dataset.sample(frac=1).reset_index(drop=True)
-        # determine the number of min-batches based on the batch size and size of training data
+        # Determine the number of min-batches based on the batch size and size of training data
         total_batch = int(len(train_dataset) / batch_size)
         avg_loss = 0
         # Loop over all batches
@@ -170,21 +176,31 @@ if __name__ == "__main__":
             titles, labels = titles.to(device), labels.to(device)
 
             # Forward + Backward + Optimize
-            optimizer.zero_grad()  # zero the gradient buffer
+            optimizer.zero_grad()  # Zero the gradient buffer
             outputs = news_net(titles)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             avg_loss += loss.item()
 
+        # 
         avg_loss = avg_loss / total_batch
         print('Finished epoch [%d/%d], Average loss: %.4f' % (epoch + 1, num_epochs, avg_loss))
 
+    # Save model after training
+    # TODO
+    
+
+    
+    ############################################################################
+    # TODO: Move evaluation parts to new script [news_evaluation.py]
+    
     # Calculate Accuracy
     news_net.eval()
     all_predictions = []
     all_labels = []
 
+    # 
     for test_data, labels in tqdm(test_generator):
         test_data, labels = test_data.to(device), labels.to(device)
         all_labels.append(labels.cpu().detach().numpy())
@@ -192,10 +208,30 @@ if __name__ == "__main__":
         _, predicted = torch.max(outputs.data, 1)
         all_predictions.append(predicted.cpu().detach().numpy())
 
+    # 
     all_predictions = torch.Tensor(np.concatenate(all_predictions))
     all_labels = torch.Tensor(np.concatenate(all_labels))
 
+    # Accuracy for multiclass classification
     accuracy = Accuracy(task='multiclass', num_classes=4)
     acc = accuracy(all_predictions, all_labels)
+    
+    # Accuracy for binary classification
+    # TODO
 
     print('Accuracy of the model on the test data: %f' % (acc,))
+    
+    # Calculate Recall
+    # TODO: For binary classification
+    # TODO: For multi-class classification
+    
+    # Calculate Precision
+    # TODO: For binary classification
+    # TODO: For multi-class classification
+        
+    # Calculate F1-Scores
+    # TODO: For binary classification
+    # TODO: For multi-class classification    
+    
+    
+    
