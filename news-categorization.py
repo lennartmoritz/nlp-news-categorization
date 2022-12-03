@@ -254,8 +254,8 @@ if __name__ == "__main__":
         print('Finished epoch [%d/%d], Average loss: %.5f, Train-Size: %d, Test-Size: %d' % (epoch + 1, num_epochs, avg_loss, train_size, test_size))
 
     # Save model after training
-    # TODO
-    torch.save(news_net, "./models/currentModel")
+    # TODO: Careful! This gets big really fast!
+    #torch.save(news_net, "./models/currentModel")
     
 
     
@@ -279,8 +279,11 @@ if __name__ == "__main__":
     all_predictions = torch.Tensor(np.concatenate(all_predictions))
     all_labels = torch.Tensor(np.concatenate(all_labels))
 
-    labels_number = len(torch.unique(all_labels))
-    print('Number of labels/classes: %d' % (labels_number))
+    labels_unique = (torch.unique(all_labels)).tolist()
+    labels_number = len(labels_unique)
+    print('Number of labels/classes: %d - which are %s' % (labels_number, labels_unique))
+    # TODO: We lose the information about the category (by indexing?) 
+    # => Have to track the real categories for later processing
 
 
     # Torchmetrics required by task description
