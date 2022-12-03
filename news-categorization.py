@@ -12,6 +12,7 @@ from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from torchmetrics import Accuracy, Recall, Precision, F1Score
 import sys
+import os
 
 
 # Split the dataset into sub-set of specific category
@@ -219,7 +220,15 @@ if __name__ == "__main__":
 
     # Save model after training
     # TODO: Careful! This gets big really fast!
-    #torch.save(news_net, "./models/currentModel")
+    save_model=False
+    if save_model:
+        os.makedirs("./models", exist_ok=True)
+        news_net.to("cpu")
+        dummy_input = torch.zeros((input_size))
+        traced_model = torch.jit.trace(news_net, dummy_input)
+        torch.jit.save(traced_model, "./models/news_net.pt")
+        my_model =torch.jit.load("./models/news_net.pt")
+        news_net.to(device)
     
     # Calculate Accuracy
     news_net.eval()
