@@ -149,9 +149,9 @@ if __name__ == "__main__":
     dataset = CustomNewsDataset(data, embeddings, list_of_classes)
     
     #train_size = int(0.8 * len(dataset))
-    train_size = 1024 # Sub-set for quick debugging
     #test_size = len(dataset) - train_size
-    test_size = 512  # Sub-set for quick debugging    
+    train_size = 8192               # Sub-set for quick debugging
+    test_size = 1024                # Sub-set for quick debugging    
     
     validate_size = len(dataset) - (train_size + test_size) # Unused sub-set for quick debugging
     
@@ -278,7 +278,8 @@ if __name__ == "__main__":
     FNR = FN/(TP+FN)    # False negative rate
     FDR = FP/(TP+FP)    # False discovery rate
     ACC = (TP+TN)/(TP+FP+FN+TN)    # Overall accuracy
-    evaluations = [FP, FN, TP, TN, TPR, TNR, PPV, NPV, FPR, FNR, FDR, ACC]
+    F1S = 2*(PPV*TPR)/(PPV+TPR)    # F1-Score
+    evaluations = [FP, FN, TP, TN, TPR, TNR, PPV, NPV, FPR, FNR, FDR, ACC, F1S]
     
     # Evaluation on scope above of class level
     FPa = sum(FP)    # Summing the values for all classes together
@@ -293,7 +294,8 @@ if __name__ == "__main__":
     FNRa = FNa/(TPa+FNa)    # False negative rate
     FDRa = FPa/(TPa+FPa)    # False discovery rate
     ACCa = (TPa+TNa)/(TPa+FPa+FNa+TNa)    # Overall accuracy
-    evaluationsa = [FPa, FNa, TPa, TNa, TPRa, TNRa, PPVa, NPVa, FPRa, FNRa, FDRa, ACCa]
+    F1Sa = 2*(PPVa*TPRa)/(PPVa+TPRa)      # F1-Score
+    evaluationsa = [FPa, FNa, TPa, TNa, TPRa, TNRa, PPVa, NPVa, FPRa, FNRa, FDRa, ACCa, F1Sa]
 
     # Save evaluations to file
     save_eval=True
@@ -303,7 +305,7 @@ if __name__ == "__main__":
         current_classes_as_string = ""
         for class_key in list_of_classes:
             current_classes_as_string = current_classes_as_string + class_key
-        current_filename = "evaluation-" + current_classes_as_string + "-" + str(num_epochs)
+        current_filename = "evaluation-" + current_classes_as_string + "-" + str(train_size) + "-" + str(num_epochs)
         current_file = "./evaluations/" + current_filename + ".txt"
         with open(current_file, 'w') as file:
             file.write(str(labels_occurences)+"\n")
@@ -330,6 +332,7 @@ if __name__ == "__main__":
         print(f"{'False negative rate:':<55}{FNR}")
         print(f"{'False discovery rate:':<55}{FDR}")
         print(f"{'Overall accuracy:':<55}{ACC}") 
+        print(f"{'F1-Score:':<55}{F1S}") 
         
         # Evaluation on scope above of class level
         print("Evaluation on scope above of class level")
@@ -343,4 +346,6 @@ if __name__ == "__main__":
         print(f"{'False negative rate:':<55}{FNRa:>12}")
         print(f"{'False discovery rate:':<55}{FDRa:>12}")
         print(f"{'Overall accuracy:':<55}{ACCa:>12}") 
-
+        print(f"{'F1-Score:':<55}{F1Sa:>12}") 
+        
+        

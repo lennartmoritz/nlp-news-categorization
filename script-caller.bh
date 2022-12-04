@@ -1,0 +1,28 @@
+#!bin/bash
+#
+# Bash-Script to call the news-categorization for automation of evaluation
+#
+################################################################################
+
+
+# All four classes #############################################################
+echo $(python news-categorization.py -l b t m e)
+
+
+# Binary cases #################################################################
+echo $(python news-categorization.py -l b t)
+echo $(python news-categorization.py -l b m)
+echo $(python news-categorization.py -l b e)
+
+echo $(python news-categorization.py -l t m)
+echo $(python news-categorization.py -l t e)
+
+echo $(python news-categorization.py -l m e)
+
+
+# Tripple-Fun for good measure (?) #############################################
+#echo $(python news-categorization.py -l t m e)
+#echo $(python news-categorization.py -l b m e)
+#echo $(python news-categorization.py -l b t e)
+#echo $(python news-categorization.py -l b t m)
+
