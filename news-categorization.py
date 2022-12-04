@@ -17,6 +17,8 @@ import os
 import argparse
 import spacy
 
+# Load the lemmatizer with enabled named entity recognition
+nlp_spacy = spacy.load('en_core_web_sm')
 
 # Split the dataset into sub-set of specific category
 def data_splitter(dataset, key, value) -> pd.DataFrame:
@@ -33,54 +35,74 @@ def data_merger(list_of_datasets):
     dataframes_merged = pd.concat(dataframes)
     return dataframes_merged
 
+# === Definition of different embedding generators for dynamic use === 
+
+# Our very own embedding generator (Task 3)
+#def custom_embedding_generator(data):
+#    # TODO: generate_embedding_a()
+#    return embedding
+
+# Use of pre-trained embeddings (Task 4)
+#def pretrained_embedding_generator():
+#    embedding = nlp_spacy 
+#    return embedding
+
+
 # Generate the word embeddings for the selected dataset
 # The basic idea of word embedding is words that occur in similar context tend to be closer to each other in vector space. 
-def get_word_embeddings(dataset):#, nlp_lemmatizer):
+def get_word_embeddings(dataset, embeddings_mode):#, nlp_lemmatizer):
     """
     Returns:
     word_embeddings:    A dict that maps word names as keys to an automatically generated word_id
     """
-    # Load the lemmatizer with enabled named entity recognition
-    nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser'])
     
-    # Getting all the vocabularies and indexing to a unique position
-    vocab = Counter()
-    # Lemmatizing words from titles
-    for text in tqdm(dataset['TITLE']):
-        doc = nlp_lemmatizer(text.lower())
-        print(" ".join([token.lemma_ +" " for token in doc]))
-        # Count occurences of tokens
-        for word in doc:
-            vocab[word.lemma_] += 1
+    # Using the pre-trained embeddings
+    if embeddings_mode == "pretrained":
+        word_embeddings = nlp_spacy
 
-    # Build word-embeddings vector for the entire data
-    word_embeddings = {}
-    for i, word in enumerate(vocab):
-        word_embeddings[word] = i
+    # Using our own embeddings
+    if embeddings_mode == "custom":
+        word_embeddings = custom_embedding_generator(data)
 
-    print("Word Embeddings: ")
-    print(word_embeddings)
+        # Getting all the vocabularies and indexing to a unique position
+        vocab = Counter()
+        # Lemmatizing words from titles
+        for text in tqdm(dataset['TITLE']):
+            doc = word_embeddings(text.lower())
+            print(" ".join([token.lemma_ +" " for token in doc]))
+            # Count occurences of tokens
+            for word in doc:
+                vocab[word.lemma_] += 1
+
+        # Build word-embeddings vector for the entire data
+        word_embeddings = {}
+        for i, word in enumerate(vocab):
+            word_embeddings[word] = i
+
+    #print("Word Embeddings: ")
+    #print(word_embeddings)
 
     return word_embeddings
-
-
+    
+# Provides data in a suitable representation for the model to be trained
 class CustomNewsDataset(Dataset):
     def __init__(self, data, embeddings, categories):
         self.labels = data['CATEGORY']
         self.titles = data['TITLE']
+        # Dynamically choose which embedding to use
         self.embeddings = embeddings
         self.categories = categories
-        self.nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser'])
     def __len__(self):
         return len(self.titles)
 
     def __getitem__(self, idx):
         title = self.titles.iloc[idx].lower()
-        title = self.nlp_lemmatizer(title)
-        embedded_title = np.zeros(len(self.embeddings), dtype=np.float64)
+        title = self.embeddings(title)
+        # TODO: Vector?
+        embedded_title = title.vector #np.zeros(len(self.embeddings), dtype=np.float64)
 
-        for token in title:
-            embedded_title[self.embeddings[token.lemma_]] += 1
+        #for token in title:
+        #    embedded_title[self.embeddings[token.lemma_]] += 1
 
         label = self.labels.iloc[idx]
         label = self.categories.index(label)
@@ -104,6 +126,7 @@ class NewsClassifier(nn.Module):
         out = self.relu(out)
         out = self.output_layer(out)
         return out
+
 
 # Safe-guarding the script to prevent errors occuring related to multiprocessing
 if __name__ == "__main__":
@@ -157,13 +180,12 @@ if __name__ == "__main__":
 
     unique_categories = len(data['CATEGORY'].unique())
 
-
-
-    # Initialize spacy 'en_core_web_sm' model, keeping only tagger component needed for lemmatization
-    #nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser', 'ner'])
+    # Specify "embedding-mode" for method-selection
+    #embedding_mode = "custom"
+    embedding_mode = "pretrained"
     
     # Get word embeddings based on currently selected dataset
-    embeddings = get_word_embeddings(data)#, nlp_lemmatizer)
+    embeddings = get_word_embeddings(data, embedding_mode)
 
     # Dataset based on DataLoader and preselected "data" (which categories?)
     dataset = CustomNewsDataset(data, embeddings, list_of_classes)
