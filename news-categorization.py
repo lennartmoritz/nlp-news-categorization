@@ -11,9 +11,10 @@ import torch.nn as nn
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from torchmetrics import Accuracy, Recall, Precision, F1Score
+from sklearn.metrics import confusion_matrix
 import sys
 import os
-
+import argparse
 
 # Split the dataset into sub-set of specific category
 def data_splitter(dataset, key, value) -> pd.DataFrame:
@@ -93,57 +94,64 @@ if __name__ == "__main__":
     # Recommended part of the solution (for ubuntu) by encountered error-message
     torch.multiprocessing.set_sharing_strategy('file_system')
 
+    # Accepting arguments to select datasets (classes) for classification task
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-l','--list', nargs='+', help='<Required> Set flag', required=True)
+    # Used like:
+    # python arg.py -l b t m e      => multiclass 
+    # python arg.py -l b t          => binary
+    
+    list_of_classes = list()
+    task_type = ""  # TODO: Might not be needed anymore(?) Maybe in evaluation-part?
+    
+    # Check input for validity
+    for _, value in parser.parse_args()._get_kwargs():
+        if value is not None:
+            list_of_classes = value
+            print('Input parameters:', list_of_classes)
+            if len(list_of_classes) == 2:
+                task_type = "binary"
+                print('Task based on number of classes will be: %s' % (task_type))
+            elif len(list_of_classes) > 2:
+                task_type = "multiclass"
+                print('Task based on number of classes will be: %s' % (task_type))
+            elif len(list_of_classes) < 2:
+                print('The number of classes is too low for any classification task!')
+                sys.exit()
+    
     # Dynamic switch between cpu and gpu (cuda)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     print('Device:', device)
 
     # === DATALOADER ===
-
-    # +++ Binary classifications +++ (all posssible combinations of two)
+    # Selection of data to be used in the model based on input parameter-list
+    
     # Group data for customized data selection
     data_all = pd.read_csv("data/uci-news-aggregator.csv")
     
-    #grouped_dataset = data_all.groupby(data_all['CATEGORY'])
-    data_e = data_splitter(data_all, 'CATEGORY', 'e') #grouped_dataset.get_group('e')
-    data_b = data_splitter(data_all, 'CATEGORY', 'b')
-    data_t = data_splitter(data_all, 'CATEGORY', 't')
-    data_m = data_splitter(data_all, 'CATEGORY', 'm')
+    # Preparing datasets based on input parameters (list of classes)
+    list_of_datasets = []   # Splittet based on class_key = {e, b, t, m}
+    for class_key in list_of_classes:
+        data_subset = data_splitter(data_all, 'CATEGORY', class_key)
+        list_of_datasets.append(data_subset)
     
-    # Sanity-Check
-    print("Number of e: " + str(len(data_e)) + "\tNumber of b: " + str(len(data_b)) + "\tNumber of t: " + str(len(data_t)) + "\tNumber of m: " + str(len(data_m)))
-    
-    # Datasets containing only two categories (for binary classification)
-    data_eb = data_merger([data_e, data_b]) # Binary (e & b)
-    data_et = data_merger([data_e, data_t]) # Binary (e & t)
-    data_em = data_merger([data_e, data_m]) # Binary (e & m)
-    data_bt = data_merger([data_b, data_t]) # Binary (b & t)
-    data_bm = data_merger([data_b, data_m]) # Binary (b & m)
-    data_tm = data_merger([data_t, data_m]) # Binary (t & m)
+    # Merge dataset to contain all required classes
+    data = data_merger(list_of_datasets)
 
-    # Sanity-Check
-    #print("Number of eb: " + str(len(data_eb)) + "\tNumber of et: " + str(len(data_et)) + "\tNumber of em: " + str(len(data_em)))
-
-    # +++ Multi-class +++ (all four of them together)
-    data_all = data_merger([data_e, data_b, data_t, data_m]) # All (e, b, t, m)
-
-    # Selection of data to be used in the model
-    # TODO: Actual selection happening => This might include some restructuring of above data #PythonMagic
-    data = data_all                     # | data_eb     | data_et       | ...
     unique_categories = len(data['CATEGORY'].unique())
 
-    categories = ['e', 'b', 't', 'm']   # | ['e', 'b']  | ['e', 't']    | ...
     
     # Get word embeddings based on currently selected dataset
     embeddings = get_word_embeddings(data)
 
     # Dataset based on DataLoader and preselected "data" (which categories?)
-    dataset = CustomNewsDataset(data, embeddings, categories)
+    dataset = CustomNewsDataset(data, embeddings, list_of_classes)
     
     #train_size = int(0.8 * len(dataset))
-    train_size = 500 # Sub-set for quick debugging
+    train_size = 1024 # Sub-set for quick debugging
     #test_size = len(dataset) - train_size
-    test_size = 100  # Sub-set for quick debugging    
+    test_size = 512  # Sub-set for quick debugging    
     
     validate_size = len(dataset) - (train_size + test_size) # Unused sub-set for quick debugging
     
@@ -174,12 +182,11 @@ if __name__ == "__main__":
 
     # Dataloader
     train_generator = DataLoader(training_dataset, **params)
-    print("Type of train_generator: ", type(train_generator))
     test_generator = DataLoader(testing_dataset, **params)
     #validate_generator = DataLoader(validating_dataset, **params)
 
     learning_rate = 0.01    # How fast the model learns
-    num_epochs = 5          # How often the model walks through the data
+    num_epochs = 2          # How often the model walks through the data
 
     # Network Parameters
     hidden_size = 100  # 1st layer and 2nd layer number of features
@@ -250,41 +257,78 @@ if __name__ == "__main__":
     labels_unique = (torch.unique(all_labels)).tolist()
     labels_number = len(labels_unique)
     print('Number of labels/classes: %d - which are %s' % (labels_number, labels_unique))
+    labels_occurences = Counter(all_labels.tolist())
+    print('Occurences of labels/classes: %s' % (labels_occurences))
 
     ## Specificity
-    from sklearn.metrics import confusion_matrix
     resulting_confusion_matrix = confusion_matrix(all_labels, all_predictions)
     FP = resulting_confusion_matrix.sum(axis=0) - np.diag(resulting_confusion_matrix)  
     FN = resulting_confusion_matrix.sum(axis=1) - np.diag(resulting_confusion_matrix)
     TP = np.diag(resulting_confusion_matrix)
     TN = resulting_confusion_matrix.sum() - (FP + FN + TP)
 
+    # Evaluation on scope of class level
+    print("Evaluation on scope of class level")
+    print(f"FP: {FP}     FN: {FN}     TP: {TP}     TN: {TN}")
+
+    # Sensitivity, hit rate, recall, or true positive rate
+    TPR = TP/(TP+FN)
+    print(f"{'Sensitivity, hit rate, recall, or true positive rate:':<55}{TPR}")
+    # Specificity or true negative rate
+    TNR = TN/(TN+FP) 
+    print(f"{'Specificity or true negative rate:':<55}{TNR}")
+    # Precision or positive predictive value
+    PPV = TP/(TP+FP)
+    print(f"{'Precision or positive predictive value:':<55}{PPV}")
+    # Negative predictive value
+    NPV = TN/(TN+FN)
+    print(f"{'Negative predictive value:':<55}{NPV}")
+    # Fall out or false positive rate
+    FPR = FP/(FP+TN)
+    print(f"{'Fall out or false positive rate:':<55}{FPR}")
+    # False negative rate
+    FNR = FN/(TP+FN)
+    print(f"{'False negative rate:':<55}{FNR}")
+    # False discovery rate
+    FDR = FP/(TP+FP)
+    print(f"{'False discovery rate:':<55}{FDR}")
+    # Overall accuracy
+    ACC = (TP+TN)/(TP+FP+FN+TN)
+    print(f"{'Overall accuracy:':<55}{ACC}") 
+    
+    # Evaluation on scope above of class level
+    print("Evaluation on scope above of class level")
+    
+    # Summing the values for all classes together
     FP = sum(FP)
     FN = sum(FN)
     TP = sum(TP)
     TN = sum(TN)
-
-    print(f"fp: {FP}\tfn: {FN}\ttp: {TP} \ttn{TN}")
+    
+    print(f"FP: {FP}     FN: {FN}     TP: {TP}     TN: {TN}")
 
     # Sensitivity, hit rate, recall, or true positive rate
     TPR = TP/(TP+FN)
-    print(f"Sensitivity, hit rate, recall, or true positive rate: {TPR}")
+    print(f"{'Sensitivity, hit rate, recall, or true positive rate:':<55}{TPR:>12}")
     # Specificity or true negative rate
     TNR = TN/(TN+FP) 
-    print(f"Specificity or true negative rate: {TNR}")
+    print(f"{'Specificity or true negative rate:':<55}{TNR:>12}")
     # Precision or positive predictive value
     PPV = TP/(TP+FP)
-    print(f"Precision or positive predictive value: {PPV}")
+    print(f"{'Precision or positive predictive value:':<55}{PPV:>12}")
     # Negative predictive value
     NPV = TN/(TN+FN)
-    print(f"Negative predictive value: {NPV}")
+    print(f"{'Negative predictive value:':<55}{NPV:>12}")
     # Fall out or false positive rate
     FPR = FP/(FP+TN)
+    print(f"{'Fall out or false positive rate:':<55}{FPR:>12}")
     # False negative rate
     FNR = FN/(TP+FN)
+    print(f"{'False negative rate:':<55}{FNR:>12}")
     # False discovery rate
     FDR = FP/(TP+FP)
-
+    print(f"{'False discovery rate:':<55}{FDR:>12}")
     # Overall accuracy
     ACC = (TP+TN)/(TP+FP+FN+TN)
-    print(f"Overall accuracy: {ACC}")    
+    print(f"{'Overall accuracy:':<55}{ACC:>12}") 
+
