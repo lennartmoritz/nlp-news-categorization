@@ -15,6 +15,8 @@ from sklearn.metrics import confusion_matrix
 import sys
 import os
 import argparse
+import spacy
+
 
 # Split the dataset into sub-set of specific category
 def data_splitter(dataset, key, value) -> pd.DataFrame:
@@ -32,23 +34,35 @@ def data_merger(list_of_datasets):
     return dataframes_merged
 
 # Generate the word embeddings for the selected dataset
-def get_word_embeddings(dataset):
+# The basic idea of word embedding is words that occur in similar context tend to be closer to each other in vector space. 
+def get_word_embeddings(dataset):#, nlp_lemmatizer):
     """
     Returns:
     word_embeddings:    A dict that maps word names as keys to an automatically generated word_id
     """
+    # Load the lemmatizer with enabled named entity recognition
+    nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser'])
+    
     # Getting all the vocabularies and indexing to a unique position
     vocab = Counter()
-    # Indexing words from the training data
-    for text in dataset['TITLE']:
-        for word in text.split(' '):
-            vocab[word.lower()] += 1
+    # Lemmatizing words from titles
+    for text in tqdm(dataset['TITLE']):
+        doc = nlp_lemmatizer(text.lower())
+        print(" ".join([token.lemma_ +" " for token in doc]))
+        # Count occurences of tokens
+        for word in doc:
+            vocab[word.lemma_] += 1
 
+    # Build word-embeddings vector for the entire data
     word_embeddings = {}
     for i, word in enumerate(vocab):
-        word_embeddings[word.lower()] = i
+        word_embeddings[word] = i
+
+    print("Word Embeddings: ")
+    print(word_embeddings)
 
     return word_embeddings
+
 
 class CustomNewsDataset(Dataset):
     def __init__(self, data, embeddings, categories):
@@ -56,20 +70,22 @@ class CustomNewsDataset(Dataset):
         self.titles = data['TITLE']
         self.embeddings = embeddings
         self.categories = categories
-
+        self.nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser'])
     def __len__(self):
         return len(self.titles)
 
     def __getitem__(self, idx):
-        title = self.titles.iloc[idx]
+        title = self.titles.iloc[idx].lower()
+        title = self.nlp_lemmatizer(title)
         embedded_title = np.zeros(len(self.embeddings), dtype=np.float64)
 
-        for word in title.split(' '):
-            embedded_title[self.embeddings[word.lower()]] += 1
+        for token in title:
+            embedded_title[self.embeddings[token.lemma_]] += 1
 
         label = self.labels.iloc[idx]
         label = self.categories.index(label)
         return torch.Tensor(embedded_title), label
+
             
 # Define the network
 class NewsClassifier(nn.Module):
@@ -95,8 +111,8 @@ if __name__ == "__main__":
     torch.multiprocessing.set_sharing_strategy('file_system')
 
     # Accepting arguments to select datasets (classes) for classification task
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-l','--list', nargs='+', help='<Required> Set flag', required=True)
+    input_parser = argparse.ArgumentParser()
+    input_parser.add_argument('-l','--list', nargs='+', help='<Required> Set flag', required=True)
     # Used like:
     # python arg.py -l b t m e      => multiclass 
     # python arg.py -l b t          => binary
@@ -105,7 +121,7 @@ if __name__ == "__main__":
     task_type = ""  # TODO: Might not be needed anymore(?) Maybe in evaluation-part?
     
     # Check input for validity
-    for _, value in parser.parse_args()._get_kwargs():
+    for _, value in input_parser.parse_args()._get_kwargs():
         if value is not None:
             list_of_classes = value
             print('Input parameters:', list_of_classes)
@@ -141,17 +157,21 @@ if __name__ == "__main__":
 
     unique_categories = len(data['CATEGORY'].unique())
 
+
+
+    # Initialize spacy 'en_core_web_sm' model, keeping only tagger component needed for lemmatization
+    #nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser', 'ner'])
     
     # Get word embeddings based on currently selected dataset
-    embeddings = get_word_embeddings(data)
+    embeddings = get_word_embeddings(data)#, nlp_lemmatizer)
 
     # Dataset based on DataLoader and preselected "data" (which categories?)
     dataset = CustomNewsDataset(data, embeddings, list_of_classes)
     
     #train_size = int(0.8 * len(dataset))
     #test_size = len(dataset) - train_size
-    train_size = 8192               # Sub-set for quick debugging
-    test_size = 1024                # Sub-set for quick debugging    
+    train_size = 100 #8192               # Sub-set for quick debugging
+    test_size = 100# 1024                # Sub-set for quick debugging    
     
     validate_size = len(dataset) - (train_size + test_size) # Unused sub-set for quick debugging
     
@@ -185,7 +205,7 @@ if __name__ == "__main__":
     #validate_generator = DataLoader(validating_dataset, **params)
 
     learning_rate = 0.01    # How fast the model learns
-    num_epochs = 10          # How often the model walks through the data
+    num_epochs = 5          # How often the model walks through the data
 
     # Network Parameters
     hidden_size = 100  # 1st layer and 2nd layer number of features
@@ -272,6 +292,8 @@ if __name__ == "__main__":
     # Evaluation on scope of class level
     TPR = TP/(TP+FN)    # Sensitivity, hit rate, recall, or true positive rate
     TNR = TN/(TN+FP)    # Specificity or true negative rate
+    print(TP)
+    print(FP)
     PPV = TP/(TP+FP)    # Precision or positive predictive value
     NPV = TN/(TN+FN)    # Negative predictive value
     FPR = FP/(FP+TN)    # Fall out or false positive rate
@@ -298,7 +320,7 @@ if __name__ == "__main__":
     evaluationsa = [FPa, FNa, TPa, TNa, TPRa, TNRa, PPVa, NPVa, FPRa, FNRa, FDRa, ACCa, F1Sa]
 
     # Save evaluations to file
-    save_eval=True
+    save_eval=False
 
     if save_eval:
         os.makedirs("./evaluations", exist_ok=True)
@@ -317,7 +339,7 @@ if __name__ == "__main__":
                 file.write(str(element)+"\n")
 
     # Display evaluations on console
-    display_eval=False
+    display_eval=True
 
     if display_eval:
         # Evaluation on scope of class level
@@ -333,6 +355,8 @@ if __name__ == "__main__":
         print(f"{'False discovery rate:':<55}{FDR}")
         print(f"{'Overall accuracy:':<55}{ACC}") 
         print(f"{'F1-Score:':<55}{F1S}") 
+        
+        print("")
         
         # Evaluation on scope above of class level
         print("Evaluation on scope above of class level")

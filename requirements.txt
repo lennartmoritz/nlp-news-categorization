@@ -4,3 +4,4 @@ numpy
 tqdm
 torchmetrics
 scikit-learn
+spacy
