@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from news_categorizer.dateset_tools import CustomNewsDataset, data_merger, data_splitter
+from news_categorizer.dataset_tools import CustomNewsDataset, data_merger, data_splitter
 from news_categorizer.embeddings import LemmaEmbedding, PretrainedEmbedding, WordEmbedding
 from news_categorizer.evaluation import evaluate
 from news_categorizer.models import NewsClassifier
