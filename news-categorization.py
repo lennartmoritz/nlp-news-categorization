@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Authors: 
 # Carlotta Mahncke, Lennart Joshua Moritz, Timon Engelke and Christian Schuler
-
+import pickle
 from collections import Counter
 
 import numpy as np
@@ -38,7 +38,15 @@ def data_merger(list_of_datasets):
 class LemmaEmbedding:
     def __init__(self, vocab):
         self.nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser'])
-        self.embeddings = self.calculate_embeddings(vocab)
+        embedding_file = 'embeddings/lemma_embedding.pkl'
+        if os.path.isfile(embedding_file):
+            with open(embedding_file, 'rb') as f:
+                self.embeddings = pickle.load(f)
+        else:
+            self.embeddings = self.calculate_embeddings(vocab)
+            os.makedirs(os.path.dirname(embedding_file), exist_ok=True)
+            with open(embedding_file, 'wb') as f:
+                pickle.dump(self.embeddings, f)
         self.embeddings_len = len(self.embeddings)
 
     # Generate the word embeddings for the selected dataset
