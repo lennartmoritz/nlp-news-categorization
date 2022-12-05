@@ -87,11 +87,13 @@ if __name__ == "__main__":
     # Dataset based on DataLoader and preselected "data" (which categories?)
     dataset = CustomNewsDataset(data, embedding, list_of_classes)
 
-    train_size = int(0.8 * len(dataset))
-    test_size = len(dataset) - train_size
+    # split dataset 80:20 into training and test, split training again into training and validation
+    train_size = int(0.8 * 0.8 * len(dataset))
+    validation_size = int(0.8 * 0.2 * len(dataset))
+    test_size = len(dataset) - train_size - validation_size
 
     # random split ensures that all categories are present in both datasets
-    training_dataset, testing_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+    training_dataset, testing_dataset, validating_dataset = torch.utils.data.random_split(dataset, [train_size, validation_size, test_size])
 
     # Parameters
     params = {'batch_size': 64,
@@ -100,8 +102,8 @@ if __name__ == "__main__":
 
     # Dataloader
     train_generator = DataLoader(training_dataset, **params)
+    validation_generator = DataLoader(validating_dataset, **params)
     test_generator = DataLoader(testing_dataset, **params)
-    #validate_generator = DataLoader(validating_dataset, **params)
 
     learning_rate = 0.01    # How fast the model learns
     num_epochs = 10          # How often the model walks through the data
@@ -116,7 +118,6 @@ if __name__ == "__main__":
     # Model for news classification
     news_net = NewsClassifier(input_size, hidden_size, num_classes)
     news_net = news_net.to(device)
-    news_net.train()
 
     # Loss and Optimizer
     criterion = nn.CrossEntropyLoss()  # This includes the Softmax loss function
@@ -130,9 +131,10 @@ if __name__ == "__main__":
     # Train the Model
     for epoch in range(num_epochs):
         # Determine the number of min-batches based on the batch size and size of training data
-        avg_loss = 0
+        avg_training_loss = 0
         total_batch = len(train_generator)
         # Loop over all batches
+        news_net.train()
         for titles, labels in tqdm(train_generator):
             titles, labels = titles.to(device), labels.to(device)
 
@@ -142,13 +144,25 @@ if __name__ == "__main__":
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            avg_loss += loss.item()
+            avg_training_loss += loss.item()
 
         # calculate average loss
-        avg_loss = avg_loss / total_batch
+        avg_training_loss = avg_training_loss / total_batch
+        # validation
+        avg_validation_loss = 0
+        validation_batch = len(validation_generator)
+        news_net.eval()
+        for titles, labels in tqdm(validation_generator):
+            titles, labels = titles.to(device), labels.to(device)
+            outputs = news_net(titles)
+            loss = criterion(outputs, labels)
+            avg_validation_loss += loss
+        avg_validation_loss /= validation_batch
         # logging
-        writer.add_scalar('Loss/train', avg_loss, epoch)
-        print('Finished epoch [%d/%d], Average loss: %.5f, Train-Size: %d, Test-Size: %d' % (epoch + 1, num_epochs, avg_loss, train_size, test_size))
+        writer.add_scalar('Loss/train', avg_training_loss, epoch)
+        writer.add_scalar('Loss/validation', avg_validation_loss, epoch)
+        print('Finished epoch [%d/%d], Average training loss: %.5f, validation loss: %.5f Train-Size: %d, Test-Size: %d' %
+              (epoch + 1, num_epochs, avg_training_loss, avg_validation_loss, train_size, test_size))
 
     writer.flush()
 
