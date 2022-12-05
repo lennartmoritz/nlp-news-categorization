@@ -87,8 +87,6 @@ if __name__ == "__main__":
     # Dataset based on DataLoader and preselected "data" (which categories?)
     dataset = CustomNewsDataset(data, embedding, list_of_classes)
 
-    writer = SummaryWriter()
-
     #train_size = int(0.8 * len(dataset))
     #test_size = len(dataset) - train_size
     train_size = 100 #8192               # Sub-set for quick debugging
@@ -132,6 +130,11 @@ if __name__ == "__main__":
     # Loss and Optimizer
     criterion = nn.CrossEntropyLoss()  # This includes the Softmax loss function
     optimizer = torch.optim.Adam(news_net.parameters(), lr=learning_rate)
+
+    # Tensorboard
+    current_classes_as_string = "".join(list_of_classes)
+    run_name = str(args.embedding) + "-" + current_classes_as_string + "-" + str(train_size) + "-" + str(num_epochs)
+    writer = SummaryWriter(os.path.join('runs', run_name))
 
     # Train the Model
     for epoch in range(num_epochs):
@@ -187,4 +190,4 @@ if __name__ == "__main__":
     all_predictions = torch.Tensor(np.concatenate(all_predictions))
     all_labels = torch.Tensor(np.concatenate(all_labels))
 
-    evaluate(all_labels, all_predictions, list_of_classes, args.embedding, train_size, num_epochs)
+    evaluate(all_labels, all_predictions, run_name)

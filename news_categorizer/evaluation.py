@@ -4,9 +4,10 @@ from collections import Counter
 import numpy as np
 import torch
 from sklearn.metrics import confusion_matrix
+from torchmetrics import Recall, Precision, F1Score
 
 
-def evaluate(all_labels, all_predictions, list_of_classes, embedding, train_size, num_epochs):
+def evaluate(all_labels, all_predictions, run_name):
     labels_unique = (torch.unique(all_labels)).tolist()
     labels_number = len(labels_unique)
     print('Number of labels/classes: %d - which are %s' % (labels_number, labels_unique))
@@ -50,16 +51,22 @@ def evaluate(all_labels, all_predictions, list_of_classes, embedding, train_size
     F1Sa = 2 * (PPVa * TPRa) / (PPVa + TPRa)  # F1-Score
     evaluationsa = [FPa, FNa, TPa, TNa, TPRa, TNRa, PPVa, NPVa, FPRa, FNRa, FDRa, ACCa, F1Sa]
 
+    # Macro recall, precision, f1-score
+    rec = Recall('multiclass', num_classes=4, average='macro')
+    macro_recall = rec(all_predictions, all_labels)
+    prec = Precision('multiclass', num_classes=4, average='macro')
+    macro_precision = prec(all_predictions, all_labels)
+    f1 = F1Score('multiclass', num_classes=4, average='macro')
+    macro_f1 = f1(all_predictions, all_labels)
+    macro_evaluations = [macro_recall, macro_precision, macro_f1]
+
     # Save evaluations to file
     save_eval = False
 
     if save_eval:
         os.makedirs("./evaluations", exist_ok=True)
-        current_classes_as_string = ""
-        for class_key in list_of_classes:
-            current_classes_as_string = current_classes_as_string + class_key
-        current_filename = "evaluation-" + str(embedding) + "-" + current_classes_as_string + "-" + str(train_size) + "-" + str(num_epochs)
-        current_file = "./evaluations/" + current_filename + ".txt"
+        filename = 'evaluations-' + run_name + '.txt'
+        current_file = os.path.join("evaluations", filename)
         with open(current_file, 'w') as file:
             file.write(str(labels_occurences) + "\n")
             file.write("\n")
@@ -68,37 +75,16 @@ def evaluate(all_labels, all_predictions, list_of_classes, embedding, train_size
             file.write("\n")
             for element in evaluationsa:
                 file.write(str(element) + "\n")
+            file.write("\n")
+            for element in macro_evaluations:
+                file.write(str(element) + "\n")
 
     # Display evaluations on console
     display_eval = True
 
     if display_eval:
-        # Evaluation on scope of class level
-        print("Evaluation on scope of class level")
-        print(f"FP: {FP}     FN: {FN}     TP: {TP}     TN: {TN}")
+        print('Macro-average:')
+        print(f"{'Recall:':<55}{macro_recall}")
+        print(f"{'Precision:':<55}{macro_precision}")
+        print(f"{'F1-Score:':<55}{macro_f1}")
 
-        print(f"{'Sensitivity, hit rate, recall, or true positive rate:':<55}{TPR}")
-        print(f"{'Specificity or true negative rate:':<55}{TNR}")
-        print(f"{'Precision or positive predictive value:':<55}{PPV}")
-        print(f"{'Negative predictive value:':<55}{NPV}")
-        print(f"{'Fall out or false positive rate:':<55}{FPR}")
-        print(f"{'False negative rate:':<55}{FNR}")
-        print(f"{'False discovery rate:':<55}{FDR}")
-        print(f"{'Overall accuracy:':<55}{ACC}")
-        print(f"{'F1-Score:':<55}{F1S}")
-
-        print("")
-
-        # Evaluation on scope above of class level
-        print("Evaluation on scope above of class level")
-        print(f"FP: {FPa}     FN: {FNa}     TP: {TPa}     TN: {TNa}")
-
-        print(f"{'Sensitivity, hit rate, recall, or true positive rate:':<55}{TPRa:>12}")
-        print(f"{'Specificity or true negative rate:':<55}{TNRa:>12}")
-        print(f"{'Precision or positive predictive value:':<55}{PPVa:>12}")
-        print(f"{'Negative predictive value:':<55}{NPVa:>12}")
-        print(f"{'Fall out or false positive rate:':<55}{FPRa:>12}")
-        print(f"{'False negative rate:':<55}{FNRa:>12}")
-        print(f"{'False discovery rate:':<55}{FDRa:>12}")
-        print(f"{'Overall accuracy:':<55}{ACCa:>12}")
-        print(f"{'F1-Score:':<55}{F1Sa:>12}")
