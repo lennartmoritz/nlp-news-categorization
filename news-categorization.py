@@ -11,6 +11,7 @@ import torch.nn as nn
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from torchmetrics import Accuracy, Recall, Precision, F1Score
+from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import confusion_matrix
 import sys
 import os
@@ -230,6 +231,8 @@ if __name__ == "__main__":
 
     # Dataset based on DataLoader and preselected "data" (which categories?)
     dataset = CustomNewsDataset(data, embedding, list_of_classes)
+
+    writer = SummaryWriter()
     
     #train_size = int(0.8 * len(dataset))
     #test_size = len(dataset) - train_size
@@ -305,7 +308,10 @@ if __name__ == "__main__":
 
         # 
         avg_loss = avg_loss / total_batch
+        writer.add_scalar('Loss/train', avg_loss, epoch)
         print('Finished epoch [%d/%d], Average loss: %.5f, Train-Size: %d, Test-Size: %d' % (epoch + 1, num_epochs, avg_loss, train_size, test_size))
+
+    writer.flush()
 
     # Save model after training TODO: Careful! This gets big really fast!
     save_model=False

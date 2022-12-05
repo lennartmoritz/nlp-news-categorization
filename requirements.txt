@@ -5,3 +5,4 @@ tqdm
 torchmetrics
 scikit-learn
 spacy
+tensorboard
