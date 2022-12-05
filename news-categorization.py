@@ -33,54 +33,104 @@ def data_merger(list_of_datasets):
     dataframes_merged = pd.concat(dataframes)
     return dataframes_merged
 
-# Generate the word embeddings for the selected dataset
-# The basic idea of word embedding is words that occur in similar context tend to be closer to each other in vector space. 
-def get_word_embeddings(dataset):#, nlp_lemmatizer):
-    """
-    Returns:
-    word_embeddings:    A dict that maps word names as keys to an automatically generated word_id
-    """
-    # Load the lemmatizer with enabled named entity recognition
-    nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser'])
-    
-    # Getting all the vocabularies and indexing to a unique position
-    vocab = Counter()
-    # Lemmatizing words from titles
-    for text in tqdm(dataset['TITLE']):
-        doc = nlp_lemmatizer(text.lower())
-        print(" ".join([token.lemma_ +" " for token in doc]))
-        # Count occurences of tokens
-        for word in doc:
-            vocab[word.lemma_] += 1
 
-    # Build word-embeddings vector for the entire data
-    word_embeddings = {}
-    for i, word in enumerate(vocab):
-        word_embeddings[word] = i
-
-    print("Word Embeddings: ")
-    print(word_embeddings)
-
-    return word_embeddings
-
-
-class CustomNewsDataset(Dataset):
-    def __init__(self, data, embeddings, categories):
-        self.labels = data['CATEGORY']
-        self.titles = data['TITLE']
-        self.embeddings = embeddings
-        self.categories = categories
+class LemmaEmbedding:
+    def __init__(self, vocab):
         self.nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser'])
-    def __len__(self):
-        return len(self.titles)
+        self.embeddings = self.calculate_embeddings(vocab)
+        self.embeddings_len = len(self.embeddings)
 
-    def __getitem__(self, idx):
-        title = self.titles.iloc[idx].lower()
+    # Generate the word embeddings for the selected dataset
+    # The basic idea of word embedding is words that occur in similar context tend to be closer to each other in vector space.
+    def calculate_embeddings(self, dataset):
+        """
+        Returns:
+        word_embeddings:    A dict that maps word names as keys to an automatically generated word_id
+        """
+        # Getting all the vocabularies and indexing to a unique position
+        vocab = set()
+        # Lemmatizing words from titles
+        for text in tqdm(dataset['TITLE']):
+            doc = self.nlp_lemmatizer(text)
+            for word in doc:
+                vocab.add(word.lemma_)
+
+        # Build word-embeddings vector for the entire data
+        word_embeddings = {}
+        for i, word in enumerate(list(vocab)):
+            word_embeddings[word] = i
+
+        return word_embeddings
+
+    def embed_word(self, title):
         title = self.nlp_lemmatizer(title)
+
         embedded_title = np.zeros(len(self.embeddings), dtype=np.float64)
 
         for token in title:
             embedded_title[self.embeddings[token.lemma_]] += 1
+
+        return embedded_title
+
+
+class WordEmbedding:
+    def __init__(self, vocab):
+        self.embeddings = self.calculate_embeddings(vocab)
+        self.embeddings_len = len(self.embeddings)
+
+    # Generate the word embeddings for the selected dataset
+    # The basic idea of word embedding is words that occur in similar context tend to be closer to each other in vector space.
+    def calculate_embeddings(self, dataset):
+        """
+        Returns:
+        word_embeddings:    A dict that maps word names as keys to an automatically generated word_id
+        """
+        # Getting all the vocabularies and indexing to a unique position
+        vocab = set()
+        # Lemmatizing words from titles
+        for text in tqdm(dataset['TITLE']):
+            for word in text.split(' '):
+                vocab.add(word)
+
+        # Build word-embeddings vector for the entire data
+        word_embeddings = {}
+        for i, word in enumerate(list(vocab)):
+            word_embeddings[word] = i
+
+        return word_embeddings
+
+    def embed_word(self, title):
+        embedded_title = np.zeros(len(self.embeddings), dtype=np.float64)
+
+        for word in title.split(' '):
+            embedded_title[self.embeddings[word]] += 1
+
+        return embedded_title
+
+
+class PretrainedEmbedding:
+    def __init__(self, vocab):
+        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+        self.nlp = spacy.load("en_core_web_trf")
+        self.embeddings_len = 768
+
+    def embed_word(self, title):
+        doc = self.nlp(title)
+        return doc._.trf_data.tensors[-1][0]
+
+class CustomNewsDataset(Dataset):
+    def __init__(self, data, embedding, categories):
+        self.labels = data['CATEGORY']
+        self.titles = data['TITLE']
+        self.embedding = embedding
+        self.categories = categories
+
+    def __len__(self):
+        return len(self.titles)
+
+    def __getitem__(self, idx):
+        title = self.titles.iloc[idx]
+        embedded_title = self.embedding.embed_word(title)
 
         label = self.labels.iloc[idx]
         label = self.categories.index(label)
@@ -112,28 +162,29 @@ if __name__ == "__main__":
 
     # Accepting arguments to select datasets (classes) for classification task
     input_parser = argparse.ArgumentParser()
-    input_parser.add_argument('-l','--list', nargs='+', help='<Required> Set flag', required=True)
+    input_parser.add_argument('-l', '--list', nargs='+', help='<Required> Set flag', required=True)
+    input_parser.add_argument('-e', '--embedding', default='lemma', choices=['lemma', 'word', 'pretrained'])
     # Used like:
     # python arg.py -l b t m e      => multiclass 
     # python arg.py -l b t          => binary
+
+    args = input_parser.parse_args()
     
     list_of_classes = list()
     task_type = ""  # TODO: Might not be needed anymore(?) Maybe in evaluation-part?
     
     # Check input for validity
-    for _, value in input_parser.parse_args()._get_kwargs():
-        if value is not None:
-            list_of_classes = value
-            print('Input parameters:', list_of_classes)
-            if len(list_of_classes) == 2:
-                task_type = "binary"
-                print('Task based on number of classes will be: %s' % (task_type))
-            elif len(list_of_classes) > 2:
-                task_type = "multiclass"
-                print('Task based on number of classes will be: %s' % (task_type))
-            elif len(list_of_classes) < 2:
-                print('The number of classes is too low for any classification task!')
-                sys.exit()
+    list_of_classes = args.list
+    print('Input parameters:', list_of_classes)
+    if len(list_of_classes) == 2:
+        task_type = "binary"
+        print('Task based on number of classes will be: %s' % (task_type))
+    elif len(list_of_classes) > 2:
+        task_type = "multiclass"
+        print('Task based on number of classes will be: %s' % (task_type))
+    elif len(list_of_classes) < 2:
+        print('The number of classes is too low for any classification task!')
+        sys.exit()
     
     # Dynamic switch between cpu and gpu (cuda)
     use_cuda = torch.cuda.is_available()
@@ -144,7 +195,7 @@ if __name__ == "__main__":
     # Selection of data to be used in the model based on input parameter-list
     
     # Group data for customized data selection
-    data_all = pd.read_csv("data/uci-news-aggregator.csv")
+    data_all = pd.read_csv("data/uci-news-rand-reduced.csv")
     
     # Preparing datasets based on input parameters (list of classes)
     list_of_datasets = []   # Splittet based on class_key = {e, b, t, m}
@@ -163,10 +214,22 @@ if __name__ == "__main__":
     #nlp_lemmatizer = spacy.load('en_core_web_sm', disable=['parser', 'ner'])
     
     # Get word embeddings based on currently selected dataset
-    embeddings = get_word_embeddings(data)#, nlp_lemmatizer)
+    if args.embedding == 'pretrained':
+        print('Using pretrained embedding')
+        embedding = PretrainedEmbedding(data)
+    elif args.embedding == 'lemma':
+        print('Using lemma embedding')
+        embedding = LemmaEmbedding(data)
+    elif args.embedding == 'word':
+        print('Using word embedding')
+        embedding = WordEmbedding(data)
+    else:
+        print('Invalid embedding specified')
+        sys.exit()
+
 
     # Dataset based on DataLoader and preselected "data" (which categories?)
-    dataset = CustomNewsDataset(data, embeddings, list_of_classes)
+    dataset = CustomNewsDataset(data, embedding, list_of_classes)
     
     #train_size = int(0.8 * len(dataset))
     #test_size = len(dataset) - train_size
@@ -177,7 +240,7 @@ if __name__ == "__main__":
     
     #TODO: check that the datasets are balanced, i.e. all categories must appear
     training_dataset, testing_dataset, validating_dataset = torch.utils.data.random_split(dataset, [train_size, test_size, validate_size])
-    
+
     def check_dataset_balance(this_dataset, intended_num_of_classes) -> bool:
         """
         Returns True if intended number of unique classes are present in this dataset
@@ -209,7 +272,7 @@ if __name__ == "__main__":
 
     # Network Parameters
     hidden_size = 100  # 1st layer and 2nd layer number of features
-    input_size = len(embeddings)  # Words in vocab
+    input_size = embedding.embeddings_len  # Words in vocab
     num_classes = unique_categories  # Categories: "e", "b", "t", "m"
     # e: entertainment | b: business | t: science and technology | m: health
     # e: 152469        | b: 115967   | t: 108344                 | m: 45639
@@ -292,8 +355,6 @@ if __name__ == "__main__":
     # Evaluation on scope of class level
     TPR = TP/(TP+FN)    # Sensitivity, hit rate, recall, or true positive rate
     TNR = TN/(TN+FP)    # Specificity or true negative rate
-    print(TP)
-    print(FP)
     PPV = TP/(TP+FP)    # Precision or positive predictive value
     NPV = TN/(TN+FN)    # Negative predictive value
     FPR = FP/(FP+TN)    # Fall out or false positive rate
@@ -339,7 +400,7 @@ if __name__ == "__main__":
                 file.write(str(element)+"\n")
 
     # Display evaluations on console
-    display_eval=True
+    display_eval = True
 
     if display_eval:
         # Evaluation on scope of class level
@@ -371,5 +432,3 @@ if __name__ == "__main__":
         print(f"{'False discovery rate:':<55}{FDRa:>12}")
         print(f"{'Overall accuracy:':<55}{ACCa:>12}") 
         print(f"{'F1-Score:':<55}{F1Sa:>12}") 
-        
-        
