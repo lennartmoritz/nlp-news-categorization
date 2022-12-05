@@ -132,6 +132,8 @@ if __name__ == "__main__":
     for epoch in range(num_epochs):
         # Determine the number of min-batches based on the batch size and size of training data
         avg_training_loss = 0
+        total = 0
+        correct = 0
         total_batch = len(train_generator)
         # Loop over all batches
         news_net.train()
@@ -145,11 +147,20 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
             avg_training_loss += loss.item()
+            _, predicted = outputs.max(1)
+            total += labels.size(0)
+            correct += predicted.eq(labels).sum().item()
 
         # calculate average loss
         avg_training_loss = avg_training_loss / total_batch
+        accuracy = correct / total
+        writer.add_scalar('train/loss', avg_training_loss, epoch)
+        writer.add_scalar('train/accuracy', accuracy, epoch)
+
         # validation
         avg_validation_loss = 0
+        total = 0
+        correct = 0
         validation_batch = len(validation_generator)
         news_net.eval()
         for titles, labels in tqdm(validation_generator):
@@ -157,13 +168,19 @@ if __name__ == "__main__":
             outputs = news_net(titles)
             loss = criterion(outputs, labels)
             avg_validation_loss += loss.item()
+            _, predicted = outputs.max(1)
+            total += labels.size(0)
+            correct += predicted.eq(labels).sum().item()
 
         avg_validation_loss /= validation_batch
-        # logging
-        writer.add_scalar('Loss/train', avg_training_loss, epoch)
-        writer.add_scalar('Loss/validation', avg_validation_loss, epoch)
-        print('Finished epoch [%d/%d], Average training loss: %.5f, validation loss: %.5f Train-Size: %d, Test-Size: %d' %
-              (epoch + 1, num_epochs, avg_training_loss, avg_validation_loss, train_size, test_size))
+        validation_accuracy = correct / total
+        writer.add_scalar('validation/loss', avg_validation_loss, epoch)
+        writer.add_scalar('validation/accuracy', validation_accuracy, epoch)
+        print('Finished epoch [%d/%d], '
+              'Average training loss: %.5f (%.5f accuracy), validation loss: %.5f (%.5f accuracy)'
+              'Train-Size: %d, Test-Size: %d' %
+              (epoch + 1, num_epochs, avg_training_loss, accuracy,
+               avg_validation_loss, validation_accuracy, train_size, test_size))
 
     writer.flush()
 
@@ -176,7 +193,7 @@ if __name__ == "__main__":
         dummy_input = torch.zeros((input_size))
         traced_model = torch.jit.trace(news_net, dummy_input)
         torch.jit.save(traced_model, "./models/news_net.pt")
-        my_model =torch.jit.load("./models/news_net.pt")
+        my_model = torch.jit.load("./models/news_net.pt")
         news_net.to(device)
 
     # Calculate Accuracy
