@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from news_categorizer.dateset_tools import CustomNewsDataset, check_dataset_balance, data_merger, data_splitter
+from news_categorizer.dateset_tools import CustomNewsDataset, data_merger, data_splitter
 from news_categorizer.embeddings import LemmaEmbedding, PretrainedEmbedding, WordEmbedding
 from news_categorizer.evaluation import evaluate
 from news_categorizer.models import NewsClassifier
@@ -87,20 +87,11 @@ if __name__ == "__main__":
     # Dataset based on DataLoader and preselected "data" (which categories?)
     dataset = CustomNewsDataset(data, embedding, list_of_classes)
 
-    #train_size = int(0.8 * len(dataset))
-    #test_size = len(dataset) - train_size
-    train_size = 100 #8192               # Sub-set for quick debugging
-    test_size = 100# 1024                # Sub-set for quick debugging    
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
 
-    validate_size = len(dataset) - (train_size + test_size) # Unused sub-set for quick debugging
-
-    # TODO: check that the datasets are balanced, i.e. all categories must appear
-    training_dataset, testing_dataset, validating_dataset = torch.utils.data.random_split(dataset, [train_size, test_size, validate_size])
-
-    if False:
-        assert check_dataset_balance(training_dataset, unique_categories)
-        assert check_dataset_balance(testing_dataset, unique_categories)
-        assert check_dataset_balance(validating_dataset, unique_categories)
+    # random split ensures that all categories are present in both datasets
+    training_dataset, testing_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
     # Parameters
     params = {'batch_size': 64,
@@ -113,7 +104,7 @@ if __name__ == "__main__":
     #validate_generator = DataLoader(validating_dataset, **params)
 
     learning_rate = 0.01    # How fast the model learns
-    num_epochs = 5          # How often the model walks through the data
+    num_epochs = 10          # How often the model walks through the data
 
     # Network Parameters
     hidden_size = 100  # 1st layer and 2nd layer number of features

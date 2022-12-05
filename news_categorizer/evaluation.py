@@ -61,7 +61,7 @@ def evaluate(all_labels, all_predictions, run_name):
     macro_evaluations = [macro_recall, macro_precision, macro_f1]
 
     # Save evaluations to file
-    save_eval = False
+    save_eval = True
 
     if save_eval:
         os.makedirs("./evaluations", exist_ok=True)
