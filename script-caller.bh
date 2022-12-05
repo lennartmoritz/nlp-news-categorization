@@ -6,18 +6,32 @@
 
 
 # All four classes #############################################################
-echo $(python news-categorization.py -l b t m e)
+echo $(python news-categorization.py -l b t m e --embedding lemma)
+echo $(python news-categorization.py -l b t m e --embedding word)
+echo $(python news-categorization.py -l b t m e --embedding pretrained)
 
 
 # Binary cases #################################################################
-echo $(python news-categorization.py -l b t)
-echo $(python news-categorization.py -l b m)
-echo $(python news-categorization.py -l b e)
+echo $(python news-categorization.py -l b t --embedding lemma)
+echo $(python news-categorization.py -l b m --embedding lemma)
+echo $(python news-categorization.py -l b e --embedding lemma)
+echo $(python news-categorization.py -l t m --embedding lemma)
+echo $(python news-categorization.py -l t e --embedding lemma)
+echo $(python news-categorization.py -l m e --embedding lemma)
 
-echo $(python news-categorization.py -l t m)
-echo $(python news-categorization.py -l t e)
+echo $(python news-categorization.py -l b t --embedding word)
+echo $(python news-categorization.py -l b m --embedding word)
+echo $(python news-categorization.py -l b e --embedding word)
+echo $(python news-categorization.py -l t m --embedding word)
+echo $(python news-categorization.py -l t e --embedding word)
+echo $(python news-categorization.py -l m e --embedding word)
 
-echo $(python news-categorization.py -l m e)
+echo $(python news-categorization.py -l b t --embedding pretrained)
+echo $(python news-categorization.py -l b m --embedding pretrained)
+echo $(python news-categorization.py -l b e --embedding pretrained)
+echo $(python news-categorization.py -l t m --embedding pretrained)
+echo $(python news-categorization.py -l t e --embedding pretrained)
+echo $(python news-categorization.py -l m e --embedding pretrained)
 
 
 # Tripple-Fun for good measure (?) #############################################
