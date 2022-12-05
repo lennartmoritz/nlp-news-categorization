@@ -156,7 +156,8 @@ if __name__ == "__main__":
             titles, labels = titles.to(device), labels.to(device)
             outputs = news_net(titles)
             loss = criterion(outputs, labels)
-            avg_validation_loss += loss
+            avg_validation_loss += loss.item()
+
         avg_validation_loss /= validation_batch
         # logging
         writer.add_scalar('Loss/train', avg_training_loss, epoch)
