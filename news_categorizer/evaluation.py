@@ -52,11 +52,13 @@ def evaluate(all_labels, all_predictions, run_name):
     evaluationsa = [FPa, FNa, TPa, TNa, TPRa, TNRa, PPVa, NPVa, FPRa, FNRa, FDRa, ACCa, F1Sa]
 
     # Macro recall, precision, f1-score
-    rec = Recall('multiclass', num_classes=4, average='macro')
+
+    task_type = 'multiclass' if labels_number > 2 else 'binary'
+    rec = Recall(task_type, num_classes=labels_number, average='macro')
     macro_recall = rec(all_predictions, all_labels)
-    prec = Precision('multiclass', num_classes=4, average='macro')
+    prec = Precision(task_type, num_classes=labels_number, average='macro')
     macro_precision = prec(all_predictions, all_labels)
-    f1 = F1Score('multiclass', num_classes=4, average='macro')
+    f1 = F1Score(task_type, num_classes=labels_number, average='macro')
     macro_f1 = f1(all_predictions, all_labels)
     macro_evaluations = [macro_recall, macro_precision, macro_f1]
 
