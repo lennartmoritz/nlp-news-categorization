@@ -1,6 +1,7 @@
 import os
 import pickle
 
+import gensim.downloader as api
 import numpy as np
 import spacy
 from tqdm import tqdm
@@ -90,10 +91,8 @@ class WordEmbedding:
 
 class PretrainedEmbedding:
     def __init__(self, vocab):
-        os.environ["TOKENIZERS_PARALLELISM"] = "true"
-        self.nlp = spacy.load("en_core_web_trf")
-        self.embeddings_len = 768
+        self.embeddings = api.load("glove-wiki-gigaword-100")
+        self.embeddings_len = 100
 
     def embed_word(self, title):
-        doc = self.nlp(title)
-        return doc._.trf_data.tensors[-1][0]
+        return self.embeddings.get_mean_vector(title.split())
