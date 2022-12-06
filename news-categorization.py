@@ -67,6 +67,8 @@ if __name__ == "__main__":
 
     # Merge dataset to contain all required classes
     data = data_merger(list_of_datasets)
+    # Drop data containing NaN values (two rows are tab unparsable)
+    data = data.dropna()
 
     unique_categories = len(data['CATEGORY'].unique())
 
