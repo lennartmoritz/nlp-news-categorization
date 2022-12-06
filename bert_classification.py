@@ -5,7 +5,7 @@ from datasets import load_dataset, Dataset, DatasetDict
 
 tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
 
-df = pd.read_csv("data/uci-news-rand-reduced.csv")
+df = pd.read_csv("data/data/uci-news-aggregator.csv")
 df = df.dropna()
 dataset = Dataset.from_pandas(df)
 
@@ -57,8 +57,8 @@ model = AutoModelForSequenceClassification.from_pretrained(
 training_args = TrainingArguments(
     output_dir="my_awesome_model",
     learning_rate=2e-5,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
     num_train_epochs=10,
     weight_decay=0.01,
     evaluation_strategy="epoch",
