@@ -7,3 +7,6 @@ spacy
 tensorboard
 gensim
 torchmetrics
+transformers
+datasets
+evaluate
