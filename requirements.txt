@@ -6,3 +6,6 @@ scikit-learn
 spacy
 tensorboard
 gensim
+transformers
+datasets
+evaluate
