@@ -6,3 +6,4 @@ scikit-learn
 spacy
 tensorboard
 gensim
+torchmetrics

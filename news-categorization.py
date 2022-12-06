@@ -18,7 +18,7 @@ from news_categorizer.embeddings import LemmaEmbedding, GloveEmbedding, Word2Vec
 from news_categorizer.evaluation import evaluate
 from news_categorizer.models import NewsClassifier
 
-# Safe-guarding the script to prevent errors occuring related to multiprocessing
+# Safe-guarding the script to prevent errors occurring related to multiprocessing
 if __name__ == "__main__":
     # Recommended part of the solution (for ubuntu) by encountered error-message
     torch.multiprocessing.set_sharing_strategy('file_system')

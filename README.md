@@ -3,6 +3,7 @@
 # nlp-news-categorization
 Assignment Option Four - News Categorization using PyTorch
 
+Link to our GitHub repository: https://github.com/lennartmoritz/nlp-news-categorization
 ---
 ---
 # Authors
@@ -14,21 +15,24 @@ Assignment Option Four - News Categorization using PyTorch
 --- 
 ---
 # Setup
- * sudo apt install python3-venv
- * python3 -m venv venv
- * source venv/bin/activate
- * pip install -r requirements.txt
- * python -m spacy download "en_core_web_sm"
- * python -m spacy download "en_core_web_trf"
+ * `sudo apt install python3-venv`
+ * `python3 -m venv venv`
+ * `source venv/bin/activate`
+ * Automatic: ./script-caller.bh`
+ * Or Manual:
+   * `pip install -r requirements.txt`
+   * `python -m spacy download "en_core_web_sm"`
  
 ---
 ---
 # Use
 ### Multiclass
- * python news-categorization.py -l b t e m
+ * `python news-categorization.py -l b t e m`
 ### Binary classification
- * python news-categorization.py -l b t
-
+ * `python news-categorization.py -l b t`
+### Specify embedding
+ * `python news-categorization.py -l b t -e word2vec`
+ * Choose from: word, lemma, word2vec, glove
 
 ---
 ---

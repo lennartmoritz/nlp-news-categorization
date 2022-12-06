@@ -3,6 +3,8 @@
 # Bash-Script to call the news-categorization for automation of evaluation
 #
 ################################################################################
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 
 # All four classes #############################################################
 python news-categorization.py -l b t m e --embedding lemma
@@ -41,25 +43,22 @@ python news-categorization.py -l t m --embedding word
 python news-categorization.py -l t e --embedding word
 python news-categorization.py -l m e --embedding word
 
-
-
-
 # All four classes #############################################################
-python news-categorization.py -l b t m e --embedding pretrained
+python news-categorization.py -l b t m e --embedding word2vec
 
-# Tripple-Fun for good measure #################################################
-python news-categorization.py -l t m e --embedding pretrained
-python news-categorization.py -l b m e --embedding pretrained
-python news-categorization.py -l b t e --embedding pretrained
-python news-categorization.py -l b t m --embedding pretrained
+# Triple-Fun for good measure #################################################
+python news-categorization.py -l t m e --embedding word2vec
+python news-categorization.py -l b m e --embedding word2vec
+python news-categorization.py -l b t e --embedding word2vec
+python news-categorization.py -l b t m --embedding word2vec
 
 # Binary cases #################################################################
-python news-categorization.py -l b t --embedding pretrained
-python news-categorization.py -l b m --embedding pretrained
-python news-categorization.py -l b e --embedding pretrained
-python news-categorization.py -l t m --embedding pretrained
-python news-categorization.py -l t e --embedding pretrained
-python news-categorization.py -l m e --embedding pretrained
+python news-categorization.py -l b t --embedding word2vec
+python news-categorization.py -l b m --embedding word2vec
+python news-categorization.py -l b e --embedding word2vec
+python news-categorization.py -l t m --embedding word2vec
+python news-categorization.py -l t e --embedding word2vec
+python news-categorization.py -l m e --embedding word2vec
 
 
 
