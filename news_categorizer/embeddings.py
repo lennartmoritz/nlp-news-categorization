@@ -89,10 +89,19 @@ class WordEmbedding:
         return embedded_title
 
 
-class PretrainedEmbedding:
+class GloveEmbedding:
     def __init__(self, vocab):
         self.embeddings = api.load("glove-wiki-gigaword-100")
         self.embeddings_len = 100
+
+    def embed_word(self, title):
+        return self.embeddings.get_mean_vector(title.split())
+
+
+class Word2VecEmbedding:
+    def __init__(self, vocab):
+        self.embeddings = api.load("word2vec-google-news-300")
+        self.embeddings_len = 300
 
     def embed_word(self, title):
         return self.embeddings.get_mean_vector(title.split())
